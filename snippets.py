@@ -39,6 +39,9 @@ def get(name):
     connection.commit()
     logging.debug("Message for Snippet Keyword {0} retrieved successfully"
     .format(name))
+    if not row:
+        # No snippet was found with the keyword supplied
+        return "404: Snippet not Found"
     return row[0]
 
 def main():
