@@ -36,9 +36,10 @@ def get(name):
     command="select message from snippets where keyword=(%s)"
     cursor.execute(command, (name,))
     row=cursor.fetchone()
+    connection.commit()
     logging.debug("Message for Snippet Keyword {0} retrieved successfully"
     .format(name))
-    return row
+    return row[0]
 
 def main():
     """Main function"""
