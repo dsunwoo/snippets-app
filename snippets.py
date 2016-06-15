@@ -63,7 +63,7 @@ def search(mkey):
     """Perform a serach on the message field for string provided"""
     logging.info("Performing search function on message field")
     with connection, connection.cursor() as cursor:
-        cursor.execute("select * from snippets where message like %s",(mkey,))
+        cursor.execute("select * from snippets where message like %s",('%'+mkey+'%',))
         rows=cursor.fetchall()
         print('Total: ',cursor.rowcount)
         print("\tKeyword \tMessage\n")
