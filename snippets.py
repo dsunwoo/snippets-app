@@ -11,8 +11,7 @@ logging.debug("Database connection established")
 
 
 def put(name, snippet):
-    """
-    Store a snippet with an associated name.
+    """Store a snippet with an associated name.
     
     Returns the name and the snippet
     """
@@ -41,12 +40,39 @@ def get(name):
         row=cursor.fetchone()
     connection.commit()
     logging.debug("Message for Snippet Keyword {0} retrieved successfully"
-    .format(name))
+        .format(name))
     if not row:
         # No snippet was found with the keyword supplied
         return "404: Snippet not Found"
     return row[0]
 
+def catalog():
+    """Retrieve a list of keywords in the database for user to view and choose"""
+    logging.info("Retrieving all snippet keywords")
+    with connection, connection.cursor() as cursor:
+        cursor.execute("select keyword from snippets order by keyword")
+        rows=cursor.fetchall()
+        print('Total: ',cursor.rowcount)
+        for row in rows:
+            print("\t",row[0])
+    connection.commit()
+    logging.debug("Message for Catalog: All keywords retrieved successfully")
+    return ""
+
+def search(mkey):
+    """Perform a serach on the message field for string provided"""
+    logging.info("Performing search function on message field")
+    with connection, connection.cursor() as cursor:
+        cursor.execute("select * from snippets where message like %s",(mkey,))
+        rows=cursor.fetchall()
+        print('Total: ',cursor.rowcount)
+        print("\tKeyword \tMessage\n")
+        for row in rows:
+            print("\t",row[0],"\t",row[1])
+    connection.commit()
+    logging.debug("Message for Search: Successfully Executed")
+    return mkey
+    
 def main():
     """Main function"""
     logging.info("Constructing parser")
@@ -65,7 +91,17 @@ def main():
     get_parser = subparsers.add_parser("get", help="Retrieve a snippet")
     get_parser.add_argument("name", help="Keyword in snippets DB")
     
+    # Subparser for the catalog command
+    logging.debug("Constructing catalog subparser")
+    get_parser = subparsers.add_parser("catalog", help="Lists all keywords in DB")
+    
+     # Subparser for the search command
+    logging.debug("Constructing search subparser")
+    get_parser = subparsers.add_parser("search", help="Search message field for string")
+    get_parser.add_argument("mkey", help="search string for message field")
+    
     arguments = parser.parse_args()
+   
     # Convert parsed arguments from Namespace to dictionary
     arguments = vars(arguments)
     command = arguments.pop("command")
@@ -76,6 +112,12 @@ def main():
     elif command == "get":
         snippet = get(**arguments)
         print("Retrieved snippet: {!r}".format(snippet))
+    elif command == "catalog":
+        print("Retrieved a list of keywords")
+        snippet = catalog()
+    elif command == "search":
+        snippet = search(**arguments)
+        print("The string {!r} was found in the above message fields:\n".format(snippet))
         
 if __name__ == "__main__":
     main()
