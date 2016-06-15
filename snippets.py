@@ -37,10 +37,9 @@ def get(name):
     Returns the snippet.
     """
     logging.info("Retrieving snippet {!r}".format(name))
-    cursor=connection.cursor()
-    command="select message from snippets where keyword=(%s)"
-    cursor.execute(command, (name,))
-    row=cursor.fetchone()
+    with connection, connection.cursor() as cursor:
+        cursor.execute("select message from snippets where keyword=%s", (name,))
+        row=cursor.fetchone()
     connection.commit()
     logging.debug("Message for Snippet Keyword {0} retrieved successfully"
     .format(name))
