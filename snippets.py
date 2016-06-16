@@ -9,24 +9,40 @@ logging.debug("Connecting to PostgreSQL")
 connection=psycopg2.connect(database="snippets")
 logging.debug("Database connection established")
 
-
-def put(name, snippet):
+def put(name, snippet, hide, show):
     """Store a snippet with an associated name.
     
     Returns the name and the snippet
     """
-    logging.info("Storing snippet {!r}: {!r}".format(name, snippet))
+    if hide:
+        hide_type="hidden"
+    else:
+        hide_type="visible"
+        
+    logging.info("Storing {!r} snippet {!r}: {!r}".format(hide_type, name, snippet))
     with connection, connection.cursor() as cursor:
         try:
-            cursor.execute("insert into snippets values (%s, %s)", (name, snippet))
+            cursor.execute("insert into snippets values (%s, %s, %s)"
+                ,(name, snippet, hide))
         except psycopg2.IntegrityError as e:
             connection.rollback()
-            command="update snippets set message=%s where keyword=%s"
-            cursor.execute(command, (snippet, name))
+            command="update snippets set message=%s, hidden=%s where keyword=%s"
+            cursor.execute(command, (snippet, hide, name))
     connection.commit()
     logging.debug("Snippet stored successfully.")
-    return name, snippet
+    return name, snippet, hide
     
+def delete(name):
+    """Delete a snippet entry with a given name."""
+    logging.info("Deleting snippet {!r}".format(name))
+    with connection, connection.cursor() as cursor:
+        # row=cursor.fetchone()
+        cursor.execute("delete from snippets where keyword=%s", (name,))
+    connection.commit()
+    logging.debug("Message for Snippet Keyword {0} deleted successfully"
+        .format(name))
+    return name
+
 def get(name):
     """Retrieve the snippet with a given name.
     
@@ -50,11 +66,11 @@ def catalog():
     """Retrieve a list of keywords in the database for user to view and choose"""
     logging.info("Retrieving all snippet keywords")
     with connection, connection.cursor() as cursor:
-        cursor.execute("select keyword from snippets order by keyword")
+        cursor.execute("select keyword, hidden from snippets where not hidden order by keyword")
         rows=cursor.fetchall()
         print('Total: ',cursor.rowcount)
         for row in rows:
-            print("\t",row[0])
+            print("\tKeyword: ",row[0],"\tHidden: ",row[1])
     connection.commit()
     logging.debug("Message for Catalog: All keywords retrieved successfully")
     return ""
@@ -63,12 +79,13 @@ def search(mkey):
     """Perform a serach on the message field for string provided"""
     logging.info("Performing search function on message field")
     with connection, connection.cursor() as cursor:
-        cursor.execute("select * from snippets where message like %s",('%'+mkey+'%',))
+        cursor.execute("select * from snippets where not hidden and message like %s"
+            ,('%'+mkey+'%',))
         rows=cursor.fetchall()
         print('Total: ',cursor.rowcount)
-        print("\tKeyword \tMessage\n")
+        print("\tKeyword:\t\tMessage:\t\tHidden:\n")
         for row in rows:
-            print("\t",row[0],"\t",row[1])
+            print("\t",row[0],"\t\t",row[1],"\t\t",row[2])
     connection.commit()
     logging.debug("Message for Search: Successfully Executed")
     return mkey
@@ -85,6 +102,16 @@ def main():
     put_parser = subparsers.add_parser("put", help="Store a snippet")
     put_parser.add_argument("name", help="Name of the snippet")
     put_parser.add_argument("snippet", help="Snippet text")
+    put_parser.add_argument("--hide", help="Hide the row from view",
+                            action="store_true", default=False)
+    put_parser.add_argument("--show","--unhide","--no-hide","--hide=0",
+                            help="Make the row visible (default)",
+                            action="store_true", default=True)
+                            
+    # Subparser for the delete command
+    logging.debug("Constructing delete subparser")
+    get_parser = subparsers.add_parser("delete", help="Delete a snippet")
+    get_parser.add_argument("name", help="Delete a keyword entry in snippets DB")
     
     # Subparser for the get command
     logging.debug("Constructing get subparser")
@@ -101,14 +128,28 @@ def main():
     get_parser.add_argument("mkey", help="search string for message field")
     
     arguments = parser.parse_args()
-   
+
+    # Handle the optional Hide/Show arguments
+    if arguments.command == 'put':
+        if arguments.show:
+            arguments.hide = False
+        else:
+            arguments.hide = True
+        if arguments.hide:
+            arguments.show = False
+        else:
+            arguments.show = True
+        
     # Convert parsed arguments from Namespace to dictionary
     arguments = vars(arguments)
     command = arguments.pop("command")
 
     if command == "put":
-        name, snippet = put(**arguments)
-        print("Stored {!r} as {!r}".format(snippet, name))
+        name, snippet, hide = put(**arguments)
+        print("Stored {!r} as {!r}. Column hidden = {!r}".format(snippet, name, hide))
+    elif command == "delete":
+        name = delete(**arguments)
+        print("Deleted {!r} from the snippets database".format(name))
     elif command == "get":
         snippet = get(**arguments)
         print("Retrieved snippet: {!r}".format(snippet))
